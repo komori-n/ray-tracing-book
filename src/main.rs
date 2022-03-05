@@ -1,11 +1,26 @@
-const WIDTH: usize = 256;
-const HEIGHT: usize = 256;
-
 mod raytrace;
 
-use raytrace::color::{ppm_string, Color};
+use raytrace::vec3::unit;
+
+use crate::raytrace::color::{ppm_string, Color};
+use crate::raytrace::ray::Ray;
+use crate::raytrace::vec3::{Point3, Vec3};
+
+const ASPECT_RATIO: f64 = 16.0 / 9.0;
+const WIDTH: usize = 400;
+const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 
 fn output() {
+    let viewpoint_height = 2.0;
+    let viewpoint_width = ASPECT_RATIO * viewpoint_height;
+    let focal_length = 1.0;
+
+    let origin = Point3::new(0.0, 0.0, 0.0);
+    let horizontal = Vec3::new(viewpoint_width, 0.0, 0.0);
+    let vertical = Vec3::new(0.0, viewpoint_height, 0.0);
+    let lower_left_corner =
+        origin - horizontal / 2.0 - vertical / 2.0 - Vec3::new(0.0, 0.0, focal_length);
+
     println!("P3");
     println!("{} {}", WIDTH, HEIGHT);
     println!("255");
@@ -13,16 +28,25 @@ fn output() {
     for j in (0..HEIGHT).rev() {
         eprint!("\rScanlines remaining: {}   ", j);
         for i in 0..WIDTH {
-            let r = (i as f64) / ((WIDTH - 1) as f64);
-            let g = (j as f64) / ((HEIGHT - 1) as f64);
-            let b = 0.25;
-            let c = Color::new(r, g, b);
-
+            let u = (i as f64) / ((WIDTH - 1) as f64);
+            let v = (j as f64) / ((HEIGHT - 1) as f64);
+            let ray = Ray::new(
+                origin,
+                lower_left_corner + u * horizontal + v * vertical - origin,
+            );
+            let c = ray_color(&ray);
             println!("{}", ppm_string(c));
         }
     }
     eprintln!("");
     eprintln!("Done");
+}
+
+fn ray_color(ray: &Ray) -> Color {
+    let unit_direction = unit(ray.dir);
+    let t = 0.5 * (unit_direction.y + 1.0);
+
+    (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
 }
 
 fn main() {
