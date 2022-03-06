@@ -1,31 +1,30 @@
 mod raytrace;
 
+use rand::prelude::*;
+
 use raytrace::hittable::Hittable;
 use raytrace::vec3::unit;
 
+use crate::raytrace::camera::Camera;
 use crate::raytrace::color::{ppm_string, Color};
 use crate::raytrace::hittable::{HittableList, Sphere};
 use crate::raytrace::ray::Ray;
-use crate::raytrace::vec3::{Point3, Vec3};
+use crate::raytrace::vec3::Point3;
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const WIDTH: usize = 400;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
+const SAMPLES_PER_PIXEL: i64 = 100;
 
 fn output() {
+    let mut rng = rand::thread_rng();
+    let uni = rand::distributions::Uniform::from(0.0..1.0);
+
     let mut world = HittableList::default();
     world.add(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)));
     world.add(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0)));
 
-    let viewpoint_height = 2.0;
-    let viewpoint_width = ASPECT_RATIO * viewpoint_height;
-    let focal_length = 1.0;
-
-    let origin = Point3::new(0.0, 0.0, 0.0);
-    let horizontal = Vec3::new(viewpoint_width, 0.0, 0.0);
-    let vertical = Vec3::new(0.0, viewpoint_height, 0.0);
-    let lower_left_corner =
-        origin - horizontal / 2.0 - vertical / 2.0 - Vec3::new(0.0, 0.0, focal_length);
+    let cam = Camera::new();
 
     println!("P3");
     println!("{} {}", WIDTH, HEIGHT);
@@ -34,14 +33,14 @@ fn output() {
     for j in (0..HEIGHT).rev() {
         eprint!("\rScanlines remaining: {}   ", j);
         for i in 0..WIDTH {
-            let u = (i as f64) / ((WIDTH - 1) as f64);
-            let v = (j as f64) / ((HEIGHT - 1) as f64);
-            let ray = Ray::new(
-                origin,
-                lower_left_corner + u * horizontal + v * vertical - origin,
-            );
-            let c = ray_color(&ray, &world);
-            println!("{}", ppm_string(c));
+            let mut color = Color::default();
+            for _ in 0..SAMPLES_PER_PIXEL {
+                let u = ((i as f64) + uni.sample(&mut rng)) / ((WIDTH - 1) as f64);
+                let v = ((j as f64) + uni.sample(&mut rng)) / ((HEIGHT - 1) as f64);
+                let r = cam.get_ray(u, v);
+                color += ray_color(&r, &world);
+            }
+            println!("{}", ppm_string(color, SAMPLES_PER_PIXEL));
         }
     }
     eprintln!("");
