@@ -71,6 +71,19 @@ pub fn random_in_unit_sphere(rng: &mut dyn rand::RngCore) -> Vec3 {
     }
 }
 
+pub fn random_unit_veector(rng: &mut dyn rand::RngCore) -> Vec3 {
+    unit(random_in_unit_sphere(rng))
+}
+
+pub fn random_in_hemisphere(rng: &mut dyn rand::RngCore, n: &Vec3) -> Vec3 {
+    let in_unit_sphere = random_in_unit_sphere(rng);
+    if dot(in_unit_sphere, *n) > 0.0 {
+        in_unit_sphere
+    } else {
+        -in_unit_sphere
+    }
+}
+
 impl Add for Vec3 {
     type Output = Vec3;
 

@@ -3,7 +3,7 @@ mod raytrace;
 use rand::prelude::*;
 
 use raytrace::hittable::Hittable;
-use raytrace::vec3::{random_in_unit_sphere, unit};
+use raytrace::vec3::{random_in_hemisphere, random_in_unit_sphere, random_unit_veector, unit};
 
 use crate::raytrace::camera::Camera;
 use crate::raytrace::color::{ppm_string, Color};
@@ -54,7 +54,7 @@ fn ray_color(rng: &mut dyn rand::RngCore, ray: &Ray, world: &dyn Hittable, depth
     }
 
     if let Some(rec) = world.hit(ray, 0.001, f64::MAX) {
-        let target = rec.p + rec.normal + random_in_unit_sphere(rng);
+        let target = rec.p + rec.normal + random_in_hemisphere(rng, &rec.normal);
         return 0.5 * ray_color(rng, &Ray::new(rec.p, target - rec.p), world, depth - 1);
     }
     let unit_direction = unit(ray.dir);
