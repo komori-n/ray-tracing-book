@@ -3,7 +3,7 @@ mod raytrace;
 use rand::prelude::*;
 
 use raytrace::hittable::Hittable;
-use raytrace::vec3::unit;
+use raytrace::vec3::{random_in_unit_sphere, unit};
 
 use crate::raytrace::camera::Camera;
 use crate::raytrace::color::{ppm_string, Color};
@@ -15,6 +15,7 @@ const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const WIDTH: usize = 400;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 const SAMPLES_PER_PIXEL: i64 = 100;
+const MAX_DEPTH: i64 = 50;
 
 fn output() {
     let mut rng = rand::thread_rng();
@@ -38,7 +39,7 @@ fn output() {
                 let u = ((i as f64) + uni.sample(&mut rng)) / ((WIDTH - 1) as f64);
                 let v = ((j as f64) + uni.sample(&mut rng)) / ((HEIGHT - 1) as f64);
                 let r = cam.get_ray(u, v);
-                color += ray_color(&r, &world);
+                color += ray_color(&mut rng, &r, &world, MAX_DEPTH);
             }
             println!("{}", ppm_string(color, SAMPLES_PER_PIXEL));
         }
@@ -47,9 +48,14 @@ fn output() {
     eprintln!("Done");
 }
 
-fn ray_color(ray: &Ray, world: &dyn Hittable) -> Color {
-    if let Some(rec) = world.hit(ray, 0.0, f64::MAX) {
-        return 0.5 * (rec.normal + Color::new(1.0, 1.0, 1.0));
+fn ray_color(rng: &mut dyn rand::RngCore, ray: &Ray, world: &dyn Hittable, depth: i64) -> Color {
+    if depth <= 0 {
+        return Color::default();
+    }
+
+    if let Some(rec) = world.hit(ray, 0.001, f64::MAX) {
+        let target = rec.p + rec.normal + random_in_unit_sphere(rng);
+        return 0.5 * ray_color(rng, &Ray::new(rec.p, target - rec.p), world, depth - 1);
     }
     let unit_direction = unit(ray.dir);
     let t = 0.5 * (unit_direction.y + 1.0);

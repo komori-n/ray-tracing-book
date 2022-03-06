@@ -1,3 +1,4 @@
+use rand::distributions::Distribution;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
@@ -19,6 +20,18 @@ impl Vec3 {
 
     pub fn length_squared(self) -> f64 {
         self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
+    pub fn random(rng: &mut dyn rand::RngCore) -> Vec3 {
+        Self::random_with_minmax(rng, 0.0, 1.0)
+    }
+
+    pub fn random_with_minmax(rng: &mut dyn rand::RngCore, min: f64, max: f64) -> Vec3 {
+        let uni = rand::distributions::Uniform::from(min..max);
+        let x = uni.sample(rng);
+        let y = uni.sample(rng);
+        let z = uni.sample(rng);
+        Vec3::new(x, y, z)
     }
 }
 
@@ -46,6 +59,15 @@ pub fn unit(v: Vec3) -> Vec3 {
         x: v.x / len,
         y: v.y / len,
         z: v.z / len,
+    }
+}
+
+pub fn random_in_unit_sphere(rng: &mut dyn rand::RngCore) -> Vec3 {
+    loop {
+        let p = Vec3::random_with_minmax(rng, -1.0, 1.0);
+        if p.length_squared() < 1.0 {
+            return p;
+        }
     }
 }
 

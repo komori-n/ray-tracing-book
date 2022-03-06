@@ -13,9 +13,9 @@ fn clamp(input: f64, min: f64, max: f64) -> f64 {
 }
 
 pub fn ppm_string(c: Color, samples_per_pixel: i64) -> String {
-    let r = c.x / (samples_per_pixel as f64);
-    let g = c.y / (samples_per_pixel as f64);
-    let b = c.z / (samples_per_pixel as f64);
+    let r = f64::sqrt(c.x / (samples_per_pixel as f64));
+    let g = f64::sqrt(c.y / (samples_per_pixel as f64));
+    let b = f64::sqrt(c.z / (samples_per_pixel as f64));
 
     let ir = (256.0 * clamp(r, 0.0, 0.999)) as i64;
     let ig = (256.0 * clamp(g, 0.0, 0.999)) as i64;
