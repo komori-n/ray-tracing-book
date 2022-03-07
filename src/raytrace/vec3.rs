@@ -33,6 +33,10 @@ impl Vec3 {
         let z = uni.sample(rng);
         Vec3::new(x, y, z)
     }
+
+    pub fn near_zero(&self) -> bool {
+        self.length() < 1e-8
+    }
 }
 
 impl std::fmt::Display for Vec3 {
@@ -62,6 +66,10 @@ pub fn unit(v: Vec3) -> Vec3 {
     }
 }
 
+pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
+    v - 2.0 * dot(v, n) * n
+}
+
 pub fn random_in_unit_sphere(rng: &mut dyn rand::RngCore) -> Vec3 {
     loop {
         let p = Vec3::random_with_minmax(rng, -1.0, 1.0);
@@ -71,7 +79,7 @@ pub fn random_in_unit_sphere(rng: &mut dyn rand::RngCore) -> Vec3 {
     }
 }
 
-pub fn random_unit_veector(rng: &mut dyn rand::RngCore) -> Vec3 {
+pub fn random_unit_vector(rng: &mut dyn rand::RngCore) -> Vec3 {
     unit(random_in_unit_sphere(rng))
 }
 
@@ -109,10 +117,14 @@ impl Sub for Vec3 {
 }
 
 impl Mul<Vec3> for Vec3 {
-    type Output = f64;
+    type Output = Vec3;
 
-    fn mul(self, other: Vec3) -> f64 {
-        self.x * other.x + self.y * other.y + self.z * other.z
+    fn mul(self, other: Vec3) -> Vec3 {
+        Vec3 {
+            x: self.x * other.x,
+            y: self.y * other.y,
+            z: self.z * other.z,
+        }
     }
 }
 
@@ -217,7 +229,7 @@ mod test {
         );
         assert_eq!(a + b, Vec3::new(5.0, 9.0, 8.0));
         assert_eq!(a - b, Vec3::new(1.0, -3.0, 0.0));
-        assert_eq!(a * b, 40.0);
+        assert_eq!(a * b, Vec3::new(6.0, 18.0, 16.0));
         assert_eq!(a * 2.0, Vec3::new(6.0, 6.0, 8.0));
         assert_eq!(2.0 * a, Vec3::new(6.0, 6.0, 8.0));
         assert_eq!(b / 2.0, Vec3::new(1.0, 3.0, 2.0));

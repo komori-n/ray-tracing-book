@@ -1,16 +1,26 @@
+use std::rc::Rc;
+
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{dot, Point3, Vec3};
 
-#[derive(Debug)]
+use super::material::Material;
+
 pub struct HitRecord {
     pub p: Point3,
     pub normal: Vec3,
+    pub material: Rc<Box<dyn Material>>,
     pub t: f64,
     pub front_face: bool,
 }
 
 impl HitRecord {
-    fn new(r: &Ray, p: Point3, outward_normal: Vec3, t: f64) -> HitRecord {
+    fn new(
+        r: &Ray,
+        p: Point3,
+        outward_normal: Vec3,
+        material: Rc<Box<dyn Material>>,
+        t: f64,
+    ) -> HitRecord {
         let front_face = dot(r.dir, outward_normal) < 0.0;
         let normal = if front_face {
             outward_normal
@@ -21,6 +31,7 @@ impl HitRecord {
         HitRecord {
             p,
             normal,
+            material,
             t,
             front_face,
         }
@@ -31,15 +42,19 @@ pub trait Hittable {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
 }
 
-#[derive(Debug, Default)]
 pub struct Sphere {
     center: Point3,
     radius: f64,
+    material: Rc<Box<dyn Material>>,
 }
 
 impl Sphere {
-    pub fn new(center: Point3, radius: f64) -> Sphere {
-        Sphere { center, radius }
+    pub fn new(center: Point3, radius: f64, material: Rc<Box<dyn Material>>) -> Sphere {
+        Sphere {
+            center,
+            radius,
+            material,
+        }
     }
 }
 
@@ -69,6 +84,7 @@ impl Hittable for Sphere {
             r,
             r.at(root),
             (r.at(root) - self.center) / self.radius,
+            self.material.clone(),
             root,
         ))
     }

@@ -1,13 +1,16 @@
 mod raytrace;
 
+use std::rc::Rc;
+
 use rand::prelude::*;
 
 use raytrace::hittable::Hittable;
-use raytrace::vec3::{random_in_hemisphere, random_in_unit_sphere, random_unit_veector, unit};
+use raytrace::vec3::unit;
 
 use crate::raytrace::camera::Camera;
 use crate::raytrace::color::{ppm_string, Color};
 use crate::raytrace::hittable::{HittableList, Sphere};
+use crate::raytrace::material::{Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::Point3;
 
@@ -22,8 +25,35 @@ fn output() {
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
     let mut world = HittableList::default();
-    world.add(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)));
-    world.add(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0)));
+    let material_ground: Rc<Box<dyn Material>> =
+        Rc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
+    let material_center: Rc<Box<dyn Material>> =
+        Rc::new(Box::new(Lambertian::new(Color::new(0.7, 0.3, 0.3))));
+    let material_left: Rc<Box<dyn Material>> =
+        Rc::new(Box::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3)));
+    let material_right: Rc<Box<dyn Material>> =
+        Rc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0)));
+
+    world.add(Box::new(Sphere::new(
+        Point3::new(0.0, -100.5, -1.0),
+        100.0,
+        material_ground,
+    )));
+    world.add(Box::new(Sphere::new(
+        Point3::new(0.0, 0.0, -1.0),
+        0.5,
+        material_center,
+    )));
+    world.add(Box::new(Sphere::new(
+        Point3::new(-1.0, 0.0, -1.0),
+        0.5,
+        material_left,
+    )));
+    world.add(Box::new(Sphere::new(
+        Point3::new(1.0, 0.0, -1.0),
+        0.5,
+        material_right,
+    )));
 
     let cam = Camera::new();
 
@@ -54,8 +84,10 @@ fn ray_color(rng: &mut dyn rand::RngCore, ray: &Ray, world: &dyn Hittable, depth
     }
 
     if let Some(rec) = world.hit(ray, 0.001, f64::MAX) {
-        let target = rec.p + rec.normal + random_in_hemisphere(rng, &rec.normal);
-        return 0.5 * ray_color(rng, &Ray::new(rec.p, target - rec.p), world, depth - 1);
+        if let Some((scattered, attenuation)) = rec.material.scatter(rng, ray, &rec) {
+            return attenuation * ray_color(rng, &scattered, world, depth - 1);
+        }
+        return Color::default();
     }
     let unit_direction = unit(ray.dir);
     let t = 0.5 * (unit_direction.y + 1.0);
