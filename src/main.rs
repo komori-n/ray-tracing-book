@@ -1,5 +1,6 @@
 mod raytrace;
 
+use std::f64::consts::PI;
 use std::mem::Discriminant;
 use std::rc::Rc;
 
@@ -13,7 +14,7 @@ use crate::raytrace::color::{ppm_string, Color};
 use crate::raytrace::hittable::{HittableList, Sphere};
 use crate::raytrace::material::{Dielectric, Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
-use crate::raytrace::vec3::Point3;
+use crate::raytrace::vec3::{Point3, Vec3};
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const WIDTH: usize = 400;
@@ -26,6 +27,7 @@ fn output() {
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
     let mut world = HittableList::default();
+
     let material_ground: Rc<Box<dyn Material>> =
         Rc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
     let material_center: Rc<Box<dyn Material>> =
@@ -47,6 +49,11 @@ fn output() {
     world.add(Box::new(Sphere::new(
         Point3::new(-1.0, 0.0, -1.0),
         0.5,
+        material_left.clone(),
+    )));
+    world.add(Box::new(Sphere::new(
+        Point3::new(-1.0, 0.0, -1.0),
+        -0.45,
         material_left,
     )));
     world.add(Box::new(Sphere::new(
@@ -55,7 +62,13 @@ fn output() {
         material_right,
     )));
 
-    let cam = Camera::new();
+    let cam = Camera::new(
+        Point3::new(-2.0, 2.0, 1.0),
+        Point3::new(0.0, 0.0, -1.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        20.0,
+        ASPECT_RATIO,
+    );
 
     println!("P3");
     println!("{} {}", WIDTH, HEIGHT);
