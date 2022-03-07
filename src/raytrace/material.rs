@@ -2,10 +2,8 @@ use crate::raytrace::{
     color::Color,
     hittable::HitRecord,
     ray::Ray,
-    vec3::{dot, random_unit_vector, reflect, unit},
+    vec3::{dot, random_in_unit_sphere, random_unit_vector, reflect, refract, unit},
 };
-
-use super::vec3::random_in_unit_sphere;
 
 pub trait Material {
     fn scatter(
@@ -74,5 +72,46 @@ impl Material for Metal {
         } else {
             None
         }
+    }
+}
+
+pub struct Dielectric {
+    ir: f64,
+}
+
+impl Dielectric {
+    pub fn new(index_of_refraction: f64) -> Dielectric {
+        Dielectric {
+            ir: index_of_refraction,
+        }
+    }
+}
+
+impl Material for Dielectric {
+    fn scatter(
+        &self,
+        rng: &mut dyn rand::RngCore,
+        r_in: &Ray,
+        rec: &HitRecord,
+    ) -> Option<(Ray, Color)> {
+        let attenuation = Color::new(1.0, 1.0, 1.0);
+        let refraction_ratio = if rec.front_face {
+            1.0 / self.ir
+        } else {
+            self.ir
+        };
+
+        let unit_direction = unit(r_in.dir);
+        let cos_theta = f64::min(dot(-unit_direction, rec.normal), 1.0);
+        let sin_theta = f64::sqrt(1.0 - cos_theta * cos_theta);
+
+        let direction = if refraction_ratio * sin_theta > 1.0 {
+            reflect(unit_direction, rec.normal)
+        } else {
+            refract(unit_direction, rec.normal, refraction_ratio)
+        };
+
+        let scattered = Ray::new(rec.p, direction);
+        Some((scattered, attenuation))
     }
 }

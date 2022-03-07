@@ -1,5 +1,6 @@
 mod raytrace;
 
+use std::mem::Discriminant;
 use std::rc::Rc;
 
 use rand::prelude::*;
@@ -10,7 +11,7 @@ use raytrace::vec3::unit;
 use crate::raytrace::camera::Camera;
 use crate::raytrace::color::{ppm_string, Color};
 use crate::raytrace::hittable::{HittableList, Sphere};
-use crate::raytrace::material::{Lambertian, Material, Metal};
+use crate::raytrace::material::{Dielectric, Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::Point3;
 
@@ -28,11 +29,10 @@ fn output() {
     let material_ground: Rc<Box<dyn Material>> =
         Rc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
     let material_center: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Lambertian::new(Color::new(0.7, 0.3, 0.3))));
-    let material_left: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3)));
+        Rc::new(Box::new(Lambertian::new(Color::new(0.1, 0.2, 0.5))));
+    let material_left: Rc<Box<dyn Material>> = Rc::new(Box::new(Dielectric::new(1.5)));
     let material_right: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0)));
+        Rc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 0.0)));
 
     world.add(Box::new(Sphere::new(
         Point3::new(0.0, -100.5, -1.0),
