@@ -1,4 +1,5 @@
-use std::rc::Rc;
+use std::borrow::BorrowMut;
+use std::sync::{Arc, Mutex};
 
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{dot, Point3, Vec3};
@@ -8,7 +9,7 @@ use super::material::Material;
 pub struct HitRecord {
     pub p: Point3,
     pub normal: Vec3,
-    pub material: Rc<Box<dyn Material>>,
+    pub material: Arc<dyn Material + Send + Sync>,
     pub t: f64,
     pub front_face: bool,
 }
@@ -18,7 +19,7 @@ impl HitRecord {
         r: &Ray,
         p: Point3,
         outward_normal: Vec3,
-        material: Rc<Box<dyn Material>>,
+        material: Arc<dyn Material + Send + Sync>,
         t: f64,
     ) -> HitRecord {
         let front_face = dot(r.dir, outward_normal) < 0.0;
@@ -45,11 +46,11 @@ pub trait Hittable {
 pub struct Sphere {
     center: Point3,
     radius: f64,
-    material: Rc<Box<dyn Material>>,
+    material: Arc<dyn Material + Send + Sync>,
 }
 
 impl Sphere {
-    pub fn new(center: Point3, radius: f64, material: Rc<Box<dyn Material>>) -> Sphere {
+    pub fn new(center: Point3, radius: f64, material: Arc<dyn Material + Send + Sync>) -> Sphere {
         Sphere {
             center,
             radius,
@@ -92,20 +93,14 @@ impl Hittable for Sphere {
 
 #[derive(Default)]
 pub struct HittableList {
-    objects: Vec<Box<dyn Hittable>>,
+    objects: Arc<Vec<Arc<dyn Hittable + Send + Sync>>>,
 }
 
 impl HittableList {
-    pub fn new(objects: Vec<Box<dyn Hittable>>) -> HittableList {
-        HittableList { objects }
-    }
-
-    pub fn clear(&mut self) {
-        self.objects.clear();
-    }
-
-    pub fn add(&mut self, object: Box<dyn Hittable>) {
-        self.objects.push(object);
+    pub fn new(objects: Vec<Arc<dyn Hittable + Send + Sync>>) -> HittableList {
+        HittableList {
+            objects: Arc::new(objects),
+        }
     }
 }
 
@@ -114,7 +109,7 @@ impl Hittable for HittableList {
         let mut closest_so_far = t_max;
         let mut hit_record = None;
 
-        for object in &self.objects {
+        for object in self.objects.iter() {
             if let Some(hit) = object.hit(r, t_min, closest_so_far) {
                 closest_so_far = hit.t;
                 hit_record = Some(hit);

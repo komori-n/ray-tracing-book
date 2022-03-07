@@ -99,6 +99,16 @@ pub fn random_in_hemisphere(rng: &mut dyn rand::RngCore, n: &Vec3) -> Vec3 {
     }
 }
 
+pub fn random_in_unit_disk(rng: &mut dyn rand::RngCore) -> Vec3 {
+    let uni = rand::distributions::Uniform::from(-1.0..1.0);
+    loop {
+        let p = Vec3::new(uni.sample(rng), uni.sample(rng), 0.0);
+        if p.length_squared() < 1.0 {
+            return p;
+        }
+    }
+}
+
 impl Add for Vec3 {
     type Output = Vec3;
 

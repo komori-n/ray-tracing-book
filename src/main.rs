@@ -3,8 +3,11 @@ mod raytrace;
 use std::f64::consts::PI;
 use std::mem::Discriminant;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
+use itertools::iproduct;
 use rand::prelude::*;
+use rayon::prelude::*;
 
 use raytrace::hittable::Hittable;
 use raytrace::vec3::unit;
@@ -16,77 +19,114 @@ use crate::raytrace::material::{Dielectric, Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{Point3, Vec3};
 
-const ASPECT_RATIO: f64 = 16.0 / 9.0;
-const WIDTH: usize = 400;
+const ASPECT_RATIO: f64 = 3.0 / 2.0;
+const WIDTH: usize = 1200;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 const SAMPLES_PER_PIXEL: i64 = 100;
-const MAX_DEPTH: i64 = 50;
+const MAX_DEPTH: i64 = 500;
+const APERTURE: f64 = 0.1;
+
+fn random_scene(rng: &mut impl rand::RngCore) -> HittableList {
+    let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    let ground_material: Arc<dyn Material + Send + Sync> =
+        Arc::new(Lambertian::new(Color::new(0.5, 0.5, 0.5)));
+    let sphere = Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground_material);
+    objects.push(Arc::new(sphere));
+
+    let uni = rand::distributions::Uniform::from(0.0..1.0);
+    for a in -11..11 {
+        for b in -11..11 {
+            let choose_mat = uni.sample(rng);
+            let center = Point3::new(
+                (a as f64) + 0.9 * uni.sample(rng),
+                0.2,
+                (b as f64) + 0.9 * uni.sample(rng),
+            );
+
+            if (center - Point3::new(4.0, 0.2, 0.0)).length() > 0.9 {
+                let material: Arc<dyn Material + Send + Sync> = if choose_mat < 0.8 {
+                    let albedo = Color::random(rng) * Color::random(rng);
+                    Arc::new(Lambertian::new(albedo))
+                } else if choose_mat < 0.95 {
+                    let albedo = Color::random_with_minmax(rng, 0.5, 1.0);
+                    let fuzz = uni.sample(rng) / 0.5;
+                    Arc::new(Metal::new(albedo, fuzz))
+                } else {
+                    Arc::new(Dielectric::new(1.5))
+                };
+
+                objects.push(Arc::new(Sphere::new(center, 0.2, material)));
+            }
+        }
+    }
+
+    let material1: Arc<dyn Material + Send + Sync> = Arc::new(Dielectric::new(1.5));
+    objects.push(Arc::new(Sphere::new(
+        Point3::new(0.0, 1.0, 0.0),
+        1.0,
+        material1,
+    )));
+
+    let material2: Arc<dyn Material + Send + Sync> =
+        Arc::new(Lambertian::new(Color::new(0.4, 0.2, 0.1)));
+    objects.push(Arc::new(Sphere::new(
+        Point3::new(-4.0, 1.0, 0.0),
+        1.0,
+        material2,
+    )));
+
+    let material3: Arc<dyn Material + Send + Sync> =
+        Arc::new(Metal::new(Color::new(0.7, 0.6, 0.5), 0.0));
+    objects.push(Arc::new(Sphere::new(
+        Point3::new(4.0, 1.0, 0.0),
+        1.0,
+        material3,
+    )));
+
+    HittableList::new(objects)
+}
 
 fn output() {
     let mut rng = rand::thread_rng();
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
-    let mut world = HittableList::default();
+    let mut world = random_scene(&mut rng);
 
-    let material_ground: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Lambertian::new(Color::new(0.8, 0.8, 0.0))));
-    let material_center: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Lambertian::new(Color::new(0.1, 0.2, 0.5))));
-    let material_left: Rc<Box<dyn Material>> = Rc::new(Box::new(Dielectric::new(1.5)));
-    let material_right: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Metal::new(Color::new(0.8, 0.6, 0.2), 0.0)));
-
-    world.add(Box::new(Sphere::new(
-        Point3::new(0.0, -100.5, -1.0),
-        100.0,
-        material_ground,
-    )));
-    world.add(Box::new(Sphere::new(
-        Point3::new(0.0, 0.0, -1.0),
-        0.5,
-        material_center,
-    )));
-    world.add(Box::new(Sphere::new(
-        Point3::new(-1.0, 0.0, -1.0),
-        0.5,
-        material_left.clone(),
-    )));
-    world.add(Box::new(Sphere::new(
-        Point3::new(-1.0, 0.0, -1.0),
-        -0.45,
-        material_left,
-    )));
-    world.add(Box::new(Sphere::new(
-        Point3::new(1.0, 0.0, -1.0),
-        0.5,
-        material_right,
-    )));
-
+    let lookfrom = Point3::new(13.0, 2.0, 3.0);
+    let lookat = Point3::new(0.0, 0.0, 0.0);
+    let vup = Vec3::new(0.0, 1.0, 0.0);
+    let dist_to_focus = 10.0;
     let cam = Camera::new(
-        Point3::new(-2.0, 2.0, 1.0),
-        Point3::new(0.0, 0.0, -1.0),
-        Vec3::new(0.0, 1.0, 0.0),
+        lookfrom,
+        lookat,
+        vup,
         20.0,
         ASPECT_RATIO,
+        APERTURE,
+        dist_to_focus,
     );
 
     println!("P3");
     println!("{} {}", WIDTH, HEIGHT);
     println!("255");
 
-    for j in (0..HEIGHT).rev() {
-        eprint!("\rScanlines remaining: {}   ", j);
-        for i in 0..WIDTH {
+    let a: Vec<_> = iproduct!((0..HEIGHT).rev(), 0..WIDTH).collect();
+    let x: Vec<_> = a
+        .into_par_iter()
+        .map(|(j, i)| {
+            let mut rng = rand::thread_rng();
             let mut color = Color::default();
             for _ in 0..SAMPLES_PER_PIXEL {
                 let u = ((i as f64) + uni.sample(&mut rng)) / ((WIDTH - 1) as f64);
                 let v = ((j as f64) + uni.sample(&mut rng)) / ((HEIGHT - 1) as f64);
-                let r = cam.get_ray(u, v);
+                let r = cam.get_ray(&mut rng, u, v);
                 color += ray_color(&mut rng, &r, &world, MAX_DEPTH);
             }
-            println!("{}", ppm_string(color, SAMPLES_PER_PIXEL));
-        }
-    }
+            color
+        })
+        .collect();
+    x.iter()
+        .for_each(|c| println!("{}", ppm_string(*c, SAMPLES_PER_PIXEL)));
     eprintln!("");
     eprintln!("Done");
 }

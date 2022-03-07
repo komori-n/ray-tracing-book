@@ -5,7 +5,7 @@ use crate::raytrace::{
     vec3::{dot, random_in_unit_sphere, random_unit_vector, reflect, refract, unit},
 };
 
-pub trait Material {
+pub trait Material: Sync + Send {
     fn scatter(
         &self,
         rng: &mut dyn rand::RngCore,
