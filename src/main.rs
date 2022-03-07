@@ -9,7 +9,7 @@ use itertools::iproduct;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use raytrace::hittable::Hittable;
+use raytrace::hittable::{Hittable, MovingSphere};
 use raytrace::vec3::unit;
 
 use crate::raytrace::camera::Camera;
@@ -19,11 +19,11 @@ use crate::raytrace::material::{Dielectric, Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{Point3, Vec3};
 
-const ASPECT_RATIO: f64 = 3.0 / 2.0;
-const WIDTH: usize = 1200;
+const ASPECT_RATIO: f64 = 16.0 / 9.0;
+const WIDTH: usize = 400;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 const SAMPLES_PER_PIXEL: i64 = 100;
-const MAX_DEPTH: i64 = 500;
+const MAX_DEPTH: i64 = 50;
 const APERTURE: f64 = 0.1;
 
 fn random_scene(rng: &mut impl rand::RngCore) -> HittableList {
@@ -55,7 +55,14 @@ fn random_scene(rng: &mut impl rand::RngCore) -> HittableList {
                     Arc::new(Dielectric::new(1.5))
                 };
 
-                objects.push(Arc::new(Sphere::new(center, 0.2, material)));
+                if choose_mat < 0.8 {
+                    let center2 = center + Vec3::new(0.0, 0.5 * uni.sample(rng), 0.0);
+                    objects.push(Arc::new(MovingSphere::new(
+                        center, center2, 0.0, 1.0, 0.2, material,
+                    )));
+                } else {
+                    objects.push(Arc::new(Sphere::new(center, 0.2, material)));
+                }
             }
         }
     }
@@ -104,6 +111,8 @@ fn output() {
         ASPECT_RATIO,
         APERTURE,
         dist_to_focus,
+        0.0,
+        1.0,
     );
 
     println!("P3");
