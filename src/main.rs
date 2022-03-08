@@ -10,7 +10,7 @@ use rand::prelude::*;
 use rayon::prelude::*;
 
 use raytrace::hittable::{Hittable, MovingSphere};
-use raytrace::texture::{CheckerTexture, Texture};
+use raytrace::texture::{CheckerTexture, NoiseTexture, Texture};
 use raytrace::vec3::unit;
 
 use crate::raytrace::camera::Camera;
@@ -115,13 +115,25 @@ fn two_spheres(rng: &mut dyn rand::RngCore) -> HittableList {
     HittableList::new(objects)
 }
 
+fn two_perlin_spheres(rng: &mut dyn rand::RngCore) -> HittableList {
+    let pertext = Arc::new(NoiseTexture::new(rng, 4.0));
+
+    let material = Arc::new(Lambertian::from_texture(pertext));
+    let sphere1 = Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, material.clone());
+    let sphere2 = Sphere::new(Point3::new(0.0, 2.0, 0.0), 2.0, material);
+
+    let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    objects.push(Arc::new(sphere1));
+    objects.push(Arc::new(sphere2));
+
+    HittableList::new(objects)
+}
+
 fn output() {
     let mut rng = rand::thread_rng();
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
-    let world = random_scene(&mut rng);
-
-    let (world, lookfrom, lookat, vfov, aperture) = match 2 {
+    let (world, lookfrom, lookat, vfov, aperture) = match 3 {
         1 => (
             random_scene(&mut rng),
             Point3::new(13.0, 2.0, 3.0),
@@ -129,8 +141,15 @@ fn output() {
             20.0,
             0.1,
         ),
-        _ => (
+        2 => (
             two_spheres(&mut rng),
+            Point3::new(13.0, 2.0, 3.0),
+            Point3::new(0.0, 0.0, 0.0),
+            20.0,
+            0.0,
+        ),
+        _ => (
+            two_perlin_spheres(&mut rng),
             Point3::new(13.0, 2.0, 3.0),
             Point3::new(0.0, 0.0, 0.0),
             20.0,

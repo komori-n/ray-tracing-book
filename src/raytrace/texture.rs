@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use crate::raytrace::{color::Color, vec3::Point3};
 
+use super::perlin::Perlin;
+
 pub trait Texture {
     fn value(&self, u: f64, v: f64, p: &Point3) -> Color;
 }
@@ -52,5 +54,27 @@ impl Texture for CheckerTexture {
         } else {
             self.even.value(u, v, p)
         }
+    }
+}
+
+pub struct NoiseTexture {
+    noise: Perlin,
+    scale: f64,
+}
+
+impl NoiseTexture {
+    pub fn new(rng: &mut dyn rand::RngCore, scale: f64) -> NoiseTexture {
+        NoiseTexture {
+            noise: Perlin::new(rng),
+            scale,
+        }
+    }
+}
+
+impl Texture for NoiseTexture {
+    fn value(&self, u: f64, v: f64, p: &Point3) -> Color {
+        Color::new(1.0, 1.0, 1.0)
+            * 0.5
+            * (1.0 + (self.scale * p.z + 10.0 * self.noise.turb(p, 7)).sin())
     }
 }
