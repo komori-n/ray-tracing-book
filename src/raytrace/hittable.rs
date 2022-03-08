@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{dot, Point3, Vec3};
 
-use super::material::Material;
+use super::color::Color;
+use super::material::{Isotropic, Lambertian, Material};
+use super::texture::Texture;
 
 #[derive(Debug, Default, Clone)]
 pub struct AABB {
@@ -778,5 +780,86 @@ impl Hittable for RotateY {
         );
 
         Some(AABB::new(min, max))
+    }
+}
+
+pub struct ConstantMedium {
+    pub boundary: Arc<dyn Hittable + Send + Sync>,
+    pub phase_function: Arc<dyn Material + Send + Sync>,
+    pub neg_inv_density: f64,
+}
+
+impl ConstantMedium {
+    pub fn new(
+        boundary: Arc<dyn Hittable + Send + Sync>,
+        density: f64,
+        c: Color,
+    ) -> ConstantMedium {
+        ConstantMedium {
+            boundary,
+            neg_inv_density: -1.0 / density,
+            phase_function: Arc::new(Isotropic::new(c)),
+        }
+    }
+
+    pub fn from_texture(
+        boundary: Arc<dyn Hittable + Send + Sync>,
+        texture: Arc<dyn Texture + Send + Sync>,
+        density: f64,
+    ) -> ConstantMedium {
+        ConstantMedium {
+            boundary,
+            neg_inv_density: -1.0 / density,
+            phase_function: Arc::new(Isotropic::from_texture(texture)),
+        }
+    }
+}
+
+impl Hittable for ConstantMedium {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let mut rec1 = self.boundary.hit(r, -f64::MAX, f64::MAX)?;
+        let mut rec2 = self.boundary.hit(r, rec1.t + 0.0001, f64::MAX)?;
+        if rec1.t < t_min {
+            rec1.t = t_min;
+        }
+        if rec2.t > t_max {
+            rec2.t = t_max;
+        }
+
+        if rec1.t >= rec2.t {
+            return None;
+        }
+
+        if rec1.t < 0.0 {
+            rec1.t = 0.0;
+        }
+
+        let ray_length = r.dir.length();
+        let distance_inside_boundary = (rec2.t - rec1.t) * ray_length;
+
+        let mut rng = rand::thread_rng();
+        let uni = rand::distributions::Uniform::from(0.0..1.0);
+        let hit_distance = self.neg_inv_density * f64::ln(uni.sample(&mut rng));
+
+        if hit_distance > distance_inside_boundary {
+            return None;
+        }
+
+        let t = rec1.t + hit_distance / ray_length;
+        let p = r.at(t);
+
+        Some(HitRecord::new(
+            r,
+            p,
+            Vec3::new(1.0, 0.0, 0.0),
+            self.phase_function.clone(),
+            t,
+            rec1.u,
+            rec1.v,
+        ))
+    }
+
+    fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB> {
+        self.boundary.bounding_box(t0, t1)
     }
 }

@@ -9,7 +9,9 @@ use itertools::iproduct;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use raytrace::hittable::{Box, Hittable, MovingSphere, RotateY, Translate, XYRect, YZRect, ZXRect};
+use raytrace::hittable::{
+    Box, ConstantMedium, Hittable, MovingSphere, RotateY, Translate, XYRect, YZRect, ZXRect,
+};
 use raytrace::material::DiffuseLight;
 use raytrace::texture::{CheckerTexture, NoiseTexture, Texture};
 use raytrace::vec3::unit;
@@ -152,13 +154,13 @@ fn cornell_box(rng: &mut dyn rand::RngCore) -> HittableList {
     let red = Arc::new(Lambertian::new(Color::new(0.65, 0.05, 0.05)));
     let white = Arc::new(Lambertian::new(Color::new(0.73, 0.73, 0.73)));
     let green = Arc::new(Lambertian::new(Color::new(0.12, 0.45, 0.15)));
-    let light = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
+    let light = Arc::new(DiffuseLight::new(Color::new(7.0, 7.0, 7.0)));
 
     let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
     objects.push(Arc::new(YZRect::new(0.0, 555.0, 0.0, 555.0, 555.0, green)));
     objects.push(Arc::new(YZRect::new(0.0, 555.0, 0.0, 555.0, 0.0, red)));
     objects.push(Arc::new(ZXRect::new(
-        227.0, 332.0, 213.0, 343.0, 554.0, light,
+        113.0, 443.0, 127.0, 432.0, 554.0, light,
     )));
     objects.push(Arc::new(ZXRect::new(
         0.0,
@@ -192,6 +194,8 @@ fn cornell_box(rng: &mut dyn rand::RngCore) -> HittableList {
     let box1: Arc<dyn Hittable + Send + Sync> = Arc::new(RotateY::new(box1, 15.0));
     let box1: Arc<dyn Hittable + Send + Sync> =
         Arc::new(Translate::new(box1, Vec3::new(265.0, 0.0, 295.0)));
+    let box1: Arc<dyn Hittable + Send + Sync> =
+        Arc::new(ConstantMedium::new(box1, 0.01, Color::new(0.0, 0.0, 0.0)));
     objects.push(box1);
 
     let box2: Arc<dyn Hittable + Send + Sync> = Arc::new(Box::new(
@@ -202,6 +206,8 @@ fn cornell_box(rng: &mut dyn rand::RngCore) -> HittableList {
     let box2: Arc<dyn Hittable + Send + Sync> = Arc::new(RotateY::new(box2, -18.0));
     let box2: Arc<dyn Hittable + Send + Sync> =
         Arc::new(Translate::new(box2, Vec3::new(130.0, 0.0, 65.0)));
+    let box2: Arc<dyn Hittable + Send + Sync> =
+        Arc::new(ConstantMedium::new(box2, 0.01, Color::new(1.0, 1.0, 1.0)));
     objects.push(box2);
 
     HittableList::new(objects)
