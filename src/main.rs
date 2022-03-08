@@ -10,6 +10,7 @@ use rand::prelude::*;
 use rayon::prelude::*;
 
 use raytrace::hittable::{Hittable, MovingSphere};
+use raytrace::texture::{CheckerTexture, Texture};
 use raytrace::vec3::unit;
 
 use crate::raytrace::camera::Camera;
@@ -20,7 +21,7 @@ use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{Point3, Vec3};
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
-const WIDTH: usize = 1200;
+const WIDTH: usize = 400;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
 const SAMPLES_PER_PIXEL: i64 = 500;
 const MAX_DEPTH: i64 = 50;
@@ -28,8 +29,12 @@ const APERTURE: f64 = 0.1;
 
 fn random_scene(rng: &mut impl rand::RngCore) -> HittableList {
     let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    let checker: Arc<dyn Texture + Send + Sync> = Arc::new(CheckerTexture::new(
+        Color::new(0.2, 0.3, 0.1),
+        Color::new(0.9, 0.9, 0.9),
+    ));
     let ground_material: Arc<dyn Material + Send + Sync> =
-        Arc::new(Lambertian::new(Color::new(0.5, 0.5, 0.5)));
+        Arc::new(Lambertian::from_texture(checker));
     let sphere = Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground_material);
     objects.push(Arc::new(sphere));
 

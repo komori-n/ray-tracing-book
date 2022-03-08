@@ -1,6 +1,7 @@
 use rand::distributions::Distribution;
 use std::borrow::BorrowMut;
 use std::cmp::Ordering;
+use std::f64::consts::PI;
 use std::sync::{Arc, Mutex};
 
 use crate::raytrace::ray::Ray;
@@ -81,6 +82,8 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub material: Arc<dyn Material + Send + Sync>,
     pub t: f64,
+    pub u: f64,
+    pub v: f64,
     pub front_face: bool,
 }
 
@@ -91,6 +94,8 @@ impl HitRecord {
         outward_normal: Vec3,
         material: Arc<dyn Material + Send + Sync>,
         t: f64,
+        u: f64,
+        v: f64,
     ) -> HitRecord {
         let front_face = dot(r.dir, outward_normal) < 0.0;
         let normal = if front_face {
@@ -104,6 +109,8 @@ impl HitRecord {
             normal,
             material,
             t,
+            u,
+            v,
             front_face,
         }
     }
@@ -128,6 +135,13 @@ impl Sphere {
             material,
         }
     }
+
+    pub fn get_sphere_uv(p: Point3) -> (f64, f64) {
+        let theta = f64::acos(-p.y);
+        let phi = f64::atan2(-p.z, p.x) + PI;
+
+        (phi / (2.0 * PI), theta / PI)
+    }
 }
 
 impl Hittable for Sphere {
@@ -151,13 +165,17 @@ impl Hittable for Sphere {
             }
         }
         let root = root;
+        let outward_normal = (r.at(root) - self.center) / self.radius;
+        let (u, v) = Sphere::get_sphere_uv(outward_normal);
 
         Some(HitRecord::new(
             r,
             r.at(root),
-            (r.at(root) - self.center) / self.radius,
+            outward_normal,
             self.material.clone(),
             root,
+            u,
+            v,
         ))
     }
 
@@ -230,6 +248,8 @@ impl Hittable for MovingSphere {
             (r.at(root) - self.center(r.time)) / self.radius,
             self.material.clone(),
             root,
+            0.0,
+            0.0,
         ))
     }
 
