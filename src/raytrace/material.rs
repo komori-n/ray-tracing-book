@@ -7,7 +7,10 @@ use crate::raytrace::{
     vec3::{dot, random_in_unit_sphere, random_unit_vector, reflect, refract, unit},
 };
 
-use super::texture::{SolidColor, Texture};
+use super::{
+    texture::{SolidColor, Texture},
+    vec3::Point3,
+};
 
 pub trait Material: Sync + Send {
     fn scatter(
@@ -16,6 +19,10 @@ pub trait Material: Sync + Send {
         r_in: &Ray,
         rec: &HitRecord,
     ) -> Option<(Ray, Color)>;
+
+    fn emitted(&self, u: f64, v: f64, p: &Point3) -> Color {
+        Color::default()
+    }
 }
 
 pub struct Lambertian {
@@ -127,5 +134,36 @@ impl Material for Dielectric {
 
         let scattered = Ray::new(rec.p, direction, r_in.time);
         Some((scattered, attenuation))
+    }
+}
+
+pub struct DiffuseLight {
+    emit: Arc<dyn Texture + Send + Sync>,
+}
+
+impl DiffuseLight {
+    pub fn new(emit: Color) -> DiffuseLight {
+        DiffuseLight {
+            emit: Arc::new(SolidColor::new(emit)),
+        }
+    }
+
+    pub fn from_texture(a: Arc<dyn Texture + Send + Sync>) -> DiffuseLight {
+        DiffuseLight { emit: a }
+    }
+}
+
+impl Material for DiffuseLight {
+    fn scatter(
+        &self,
+        _rng: &mut dyn rand::RngCore,
+        _r_in: &Ray,
+        _rec: &HitRecord,
+    ) -> Option<(Ray, Color)> {
+        None
+    }
+
+    fn emitted(&self, u: f64, v: f64, p: &Point3) -> Color {
+        self.emit.value(u, v, p)
     }
 }

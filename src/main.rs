@@ -9,7 +9,8 @@ use itertools::iproduct;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use raytrace::hittable::{Hittable, MovingSphere};
+use raytrace::hittable::{Hittable, MovingSphere, XYRect, YZRect, ZXRect};
+use raytrace::material::DiffuseLight;
 use raytrace::texture::{CheckerTexture, NoiseTexture, Texture};
 use raytrace::vec3::unit;
 
@@ -21,9 +22,9 @@ use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{Point3, Vec3};
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
-const WIDTH: usize = 400;
+const WIDTH: usize = 600;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: i64 = 500;
+const SAMPLES_PER_PIXEL: i64 = 1000;
 const MAX_DEPTH: i64 = 50;
 const APERTURE: f64 = 0.1;
 
@@ -129,13 +130,65 @@ fn two_perlin_spheres(rng: &mut dyn rand::RngCore) -> HittableList {
     HittableList::new(objects)
 }
 
+fn sample_lights(rng: &mut dyn rand::RngCore) -> HittableList {
+    let pertext = Arc::new(NoiseTexture::new(rng, 4.0));
+
+    let material = Arc::new(Lambertian::from_texture(pertext));
+    let sphere1 = Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, material.clone());
+    let sphere2 = Sphere::new(Point3::new(0.0, 2.0, 0.0), 2.0, material);
+
+    let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    objects.push(Arc::new(sphere1));
+    objects.push(Arc::new(sphere2));
+
+    let difflight = Arc::new(DiffuseLight::new(Color::new(4.0, 4.0, 4.0)));
+    let light = XYRect::new(3.0, 5.0, 1.0, 3.0, -2.0, difflight);
+    objects.push(Arc::new(light));
+
+    HittableList::new(objects)
+}
+
+fn cornell_box(rng: &mut dyn rand::RngCore) -> HittableList {
+    let red = Arc::new(Lambertian::new(Color::new(0.65, 0.05, 0.05)));
+    let white = Arc::new(Lambertian::new(Color::new(0.73, 0.73, 0.73)));
+    let green = Arc::new(Lambertian::new(Color::new(0.12, 0.45, 0.15)));
+    let light = Arc::new(DiffuseLight::new(Color::new(15.0, 15.0, 15.0)));
+
+    let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    objects.push(Arc::new(YZRect::new(0.0, 555.0, 0.0, 555.0, 555.0, green)));
+    objects.push(Arc::new(YZRect::new(0.0, 555.0, 0.0, 555.0, 0.0, red)));
+    objects.push(Arc::new(ZXRect::new(
+        227.0, 332.0, 213.0, 343.0, 554.0, light,
+    )));
+    objects.push(Arc::new(ZXRect::new(
+        0.0,
+        555.0,
+        0.0,
+        555.0,
+        0.0,
+        white.clone(),
+    )));
+    objects.push(Arc::new(ZXRect::new(
+        0.0,
+        555.0,
+        0.0,
+        555.0,
+        555.0,
+        white.clone(),
+    )));
+    objects.push(Arc::new(XYRect::new(0.0, 555.0, 0.0, 555.0, 555.0, white)));
+
+    HittableList::new(objects)
+}
+
 fn output() {
     let mut rng = rand::thread_rng();
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
-    let (world, lookfrom, lookat, vfov, aperture) = match 3 {
+    let (world, background, lookfrom, lookat, vfov, aperture) = match 0 {
         1 => (
             random_scene(&mut rng),
+            Color::new(0.7, 0.8, 1.0),
             Point3::new(13.0, 2.0, 3.0),
             Point3::new(0.0, 0.0, 0.0),
             20.0,
@@ -143,16 +196,34 @@ fn output() {
         ),
         2 => (
             two_spheres(&mut rng),
+            Color::new(0.7, 0.8, 1.0),
             Point3::new(13.0, 2.0, 3.0),
             Point3::new(0.0, 0.0, 0.0),
             20.0,
             0.0,
         ),
-        _ => (
+        3 => (
             two_perlin_spheres(&mut rng),
+            Color::new(0.7, 0.8, 1.0),
             Point3::new(13.0, 2.0, 3.0),
             Point3::new(0.0, 0.0, 0.0),
             20.0,
+            0.0,
+        ),
+        4 => (
+            sample_lights(&mut rng),
+            Color::new(0.0, 0.0, 0.0),
+            Point3::new(26.0, 3.0, 6.0),
+            Point3::new(0.0, 2.0, 0.0),
+            20.0,
+            0.0,
+        ),
+        _ => (
+            cornell_box(&mut rng),
+            Color::new(0.0, 0.0, 0.0),
+            Point3::new(278.0, 278.0, -800.0),
+            Point3::new(278.0, 278.0, 0.0),
+            40.0,
             0.0,
         ),
     };
@@ -184,7 +255,7 @@ fn output() {
                 let u = ((i as f64) + uni.sample(&mut rng)) / ((WIDTH - 1) as f64);
                 let v = ((j as f64) + uni.sample(&mut rng)) / ((HEIGHT - 1) as f64);
                 let r = cam.get_ray(&mut rng, u, v);
-                color += ray_color(&mut rng, &r, &world, MAX_DEPTH);
+                color += ray_color(&mut rng, &r, &background, &world, MAX_DEPTH);
             }
             color
         })
@@ -195,20 +266,29 @@ fn output() {
     eprintln!("Done");
 }
 
-fn ray_color(rng: &mut dyn rand::RngCore, ray: &Ray, world: &dyn Hittable, depth: i64) -> Color {
+fn ray_color(
+    rng: &mut dyn rand::RngCore,
+    ray: &Ray,
+    background: &Color,
+    world: &dyn Hittable,
+    depth: i64,
+) -> Color {
     if depth <= 0 {
         return Color::default();
     }
 
     if let Some(rec) = world.hit(ray, 0.001, f64::MAX) {
+        let emmited = rec.material.emitted(rec.u, rec.v, &rec.p);
         if let Some((scattered, attenuation)) = rec.material.scatter(rng, ray, &rec) {
-            return attenuation * ray_color(rng, &scattered, world, depth - 1);
+            return emmited
+                + attenuation * ray_color(rng, &scattered, background, world, depth - 1);
+        } else {
+            return emmited;
         }
         return Color::default();
+    } else {
+        return *background;
     }
-    let unit_direction = unit(ray.dir);
-    let t = 0.5 * (unit_direction.y + 1.0);
-    return (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0);
 }
 
 fn main() {
