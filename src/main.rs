@@ -14,15 +14,15 @@ use raytrace::vec3::unit;
 
 use crate::raytrace::camera::Camera;
 use crate::raytrace::color::{ppm_string, Color};
-use crate::raytrace::hittable::{HittableList, Sphere};
+use crate::raytrace::hittable::{BVHNode, HittableList, Sphere};
 use crate::raytrace::material::{Dielectric, Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{Point3, Vec3};
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
-const WIDTH: usize = 400;
+const WIDTH: usize = 1200;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: i64 = 100;
+const SAMPLES_PER_PIXEL: i64 = 500;
 const MAX_DEPTH: i64 = 50;
 const APERTURE: f64 = 0.1;
 
@@ -97,7 +97,8 @@ fn output() {
     let mut rng = rand::thread_rng();
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
-    let mut world = random_scene(&mut rng);
+    let world = random_scene(&mut rng);
+    let world = BVHNode::new(&mut rng, world, 0.0, 1.0);
 
     let lookfrom = Point3::new(13.0, 2.0, 3.0);
     let lookat = Point3::new(0.0, 0.0, 0.0);

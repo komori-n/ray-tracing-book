@@ -25,7 +25,7 @@ mod test {
     fn basic() {
         let orig = Point3::new(3.0, 3.0, 4.0);
         let dir = Vec3::new(2.0, 6.0, 4.0);
-        let r = Ray::new(orig, dir);
+        let r = Ray::new(orig, dir, 0.0);
 
         assert_eq!(r.at(0.0), orig);
         assert_eq!(r.at(1.0), orig + dir);

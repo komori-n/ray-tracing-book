@@ -1,5 +1,7 @@
 use rand::distributions::Distribution;
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{
+    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct Vec3 {
@@ -105,6 +107,30 @@ pub fn random_in_unit_disk(rng: &mut dyn rand::RngCore) -> Vec3 {
         let p = Vec3::new(uni.sample(rng), uni.sample(rng), 0.0);
         if p.length_squared() < 1.0 {
             return p;
+        }
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("Index out of bounds"),
+        }
+    }
+}
+
+impl IndexMut<usize> for Vec3 {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("Index out of bounds"),
         }
     }
 }
@@ -244,6 +270,12 @@ mod test {
             unit(a),
             Vec3::new(3.0, 3.0, 4.0) / f64::sqrt(3.0 * 3.0 + 3.0 * 3.0 + 4.0 * 4.0)
         );
+
+        assert_eq!(a[0], 3.0);
+        let mut c = a;
+        c[1] = 5.0;
+        assert_eq!(c[1], 5.0);
+
         assert_eq!(a + b, Vec3::new(5.0, 9.0, 8.0));
         assert_eq!(a - b, Vec3::new(1.0, -3.0, 0.0));
         assert_eq!(a * b, Vec3::new(6.0, 18.0, 16.0));
