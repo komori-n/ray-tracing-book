@@ -9,7 +9,7 @@ use itertools::iproduct;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use raytrace::hittable::{Hittable, MovingSphere, XYRect, YZRect, ZXRect};
+use raytrace::hittable::{Box, Hittable, MovingSphere, RotateY, Translate, XYRect, YZRect, ZXRect};
 use raytrace::material::DiffuseLight;
 use raytrace::texture::{CheckerTexture, NoiseTexture, Texture};
 use raytrace::vec3::unit;
@@ -24,7 +24,7 @@ use crate::raytrace::vec3::{Point3, Vec3};
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const WIDTH: usize = 600;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: i64 = 1000;
+const SAMPLES_PER_PIXEL: i64 = 100;
 const MAX_DEPTH: i64 = 50;
 const APERTURE: f64 = 0.1;
 
@@ -176,7 +176,33 @@ fn cornell_box(rng: &mut dyn rand::RngCore) -> HittableList {
         555.0,
         white.clone(),
     )));
-    objects.push(Arc::new(XYRect::new(0.0, 555.0, 0.0, 555.0, 555.0, white)));
+    objects.push(Arc::new(XYRect::new(
+        0.0,
+        555.0,
+        0.0,
+        555.0,
+        555.0,
+        white.clone(),
+    )));
+    let box1: Arc<dyn Hittable + Send + Sync> = Arc::new(Box::new(
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(165.0, 330.0, 165.0),
+        white.clone(),
+    ));
+    let box1: Arc<dyn Hittable + Send + Sync> = Arc::new(RotateY::new(box1, 15.0));
+    let box1: Arc<dyn Hittable + Send + Sync> =
+        Arc::new(Translate::new(box1, Vec3::new(265.0, 0.0, 295.0)));
+    objects.push(box1);
+
+    let box2: Arc<dyn Hittable + Send + Sync> = Arc::new(Box::new(
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(165.0, 165.0, 165.0),
+        white.clone(),
+    ));
+    let box2: Arc<dyn Hittable + Send + Sync> = Arc::new(RotateY::new(box2, -18.0));
+    let box2: Arc<dyn Hittable + Send + Sync> =
+        Arc::new(Translate::new(box2, Vec3::new(130.0, 0.0, 65.0)));
+    objects.push(box2);
 
     HittableList::new(objects)
 }

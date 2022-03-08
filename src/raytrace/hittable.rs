@@ -1,3 +1,4 @@
+use itertools::iproduct;
 use rand::distributions::Distribution;
 use std::borrow::BorrowMut;
 use std::cmp::Ordering;
@@ -580,5 +581,202 @@ impl Hittable for ZXRect {
             Vec3::new(self.x0, self.k - 0.0001, self.z0),
             Vec3::new(self.x1, self.k + 0.0001, self.z1),
         ))
+    }
+}
+
+pub struct Box {
+    pub box_min: Vec3,
+    pub box_max: Vec3,
+    pub sides: HittableList,
+}
+
+impl Box {
+    pub fn new(box_min: Vec3, box_max: Vec3, material: Arc<dyn Material + Send + Sync>) -> Box {
+        let mut sides: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+        sides.push(Arc::new(XYRect::new(
+            box_min.x,
+            box_max.x,
+            box_min.y,
+            box_max.y,
+            box_min.z,
+            material.clone(),
+        )));
+        sides.push(Arc::new(XYRect::new(
+            box_min.x,
+            box_max.x,
+            box_min.y,
+            box_max.y,
+            box_max.z,
+            material.clone(),
+        )));
+        sides.push(Arc::new(YZRect::new(
+            box_min.y,
+            box_max.y,
+            box_min.z,
+            box_max.z,
+            box_min.x,
+            material.clone(),
+        )));
+        sides.push(Arc::new(YZRect::new(
+            box_min.y,
+            box_max.y,
+            box_min.z,
+            box_max.z,
+            box_max.x,
+            material.clone(),
+        )));
+        sides.push(Arc::new(ZXRect::new(
+            box_min.z,
+            box_max.z,
+            box_min.x,
+            box_max.x,
+            box_min.y,
+            material.clone(),
+        )));
+        sides.push(Arc::new(ZXRect::new(
+            box_min.z,
+            box_max.z,
+            box_min.x,
+            box_max.x,
+            box_max.y,
+            material.clone(),
+        )));
+
+        Box {
+            box_min,
+            box_max,
+            sides: HittableList::new(sides),
+        }
+    }
+}
+
+impl Hittable for Box {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        self.sides.hit(r, t_min, t_max)
+    }
+
+    fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB> {
+        Some(AABB::new(self.box_min, self.box_max))
+    }
+}
+
+pub struct Translate {
+    pub obj: Arc<dyn Hittable + Send + Sync>,
+    pub offset: Vec3,
+}
+
+impl Translate {
+    pub fn new(obj: Arc<dyn Hittable + Send + Sync>, offset: Vec3) -> Translate {
+        Translate { obj, offset }
+    }
+}
+
+impl Hittable for Translate {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let moved_r = Ray::new(r.orig - self.offset, r.dir, r.time);
+        let rec = self.obj.hit(&moved_r, t_min, t_max)?;
+
+        Some(HitRecord::new(
+            &moved_r,
+            rec.p + self.offset,
+            rec.normal,
+            rec.material,
+            rec.t,
+            rec.u,
+            rec.v,
+        ))
+    }
+
+    fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB> {
+        self.obj
+            .bounding_box(t0, t1)
+            .map(|aabb| AABB::new(aabb.min + self.offset, aabb.max + self.offset))
+    }
+}
+
+pub struct RotateY {
+    pub ptr: Arc<dyn Hittable + Send + Sync>,
+    pub sin_theta: f64,
+    pub cos_theta: f64,
+}
+
+impl RotateY {
+    pub fn new(ptr: Arc<dyn Hittable + Send + Sync>, angle: f64) -> RotateY {
+        let radians = angle.to_radians();
+        RotateY {
+            ptr,
+            sin_theta: radians.sin(),
+            cos_theta: radians.cos(),
+        }
+    }
+}
+
+impl Hittable for RotateY {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let origin = Vec3::new(
+            self.cos_theta * r.orig.x - self.sin_theta * r.orig.z,
+            r.orig.y,
+            self.sin_theta * r.orig.x + self.cos_theta * r.orig.z,
+        );
+
+        let direction = Vec3::new(
+            self.cos_theta * r.dir.x - self.sin_theta * r.dir.z,
+            r.dir.y,
+            self.sin_theta * r.dir.x + self.cos_theta * r.dir.z,
+        );
+        let r = Ray::new(origin, direction, r.time);
+        let rec = self.ptr.hit(&r, t_min, t_max)?;
+
+        let p = Vec3::new(
+            self.cos_theta * rec.p.x + self.sin_theta * rec.p.z,
+            rec.p.y,
+            -self.sin_theta * rec.p.x + self.cos_theta * rec.p.z,
+        );
+
+        let normal = Vec3::new(
+            self.cos_theta * rec.normal.x + self.sin_theta * rec.normal.z,
+            rec.normal.y,
+            -self.sin_theta * rec.normal.x + self.cos_theta * rec.normal.z,
+        );
+
+        Some(HitRecord::new(
+            &r,
+            p,
+            normal,
+            rec.material,
+            rec.t,
+            rec.u,
+            rec.v,
+        ))
+    }
+
+    fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB> {
+        let bbox = self.ptr.bounding_box(t0, t1)?;
+
+        let v = iproduct!(
+            [bbox.min.x, bbox.max.x],
+            [bbox.min.y, bbox.max.y],
+            [bbox.min.z, bbox.max.z]
+        )
+        .map(|(x, y, z)| {
+            Vec3::new(
+                self.cos_theta * x + self.sin_theta * z,
+                y,
+                -self.sin_theta * x + self.cos_theta * z,
+            )
+        })
+        .collect::<Vec<_>>();
+        let min = Vec3::new(
+            v.iter().map(|v| v.x).reduce(|a, b| a.min(b))?,
+            v.iter().map(|v| v.y).reduce(|a, b| a.min(b))?,
+            v.iter().map(|v| v.z).reduce(|a, b| a.min(b))?,
+        );
+        let max = Vec3::new(
+            v.iter().map(|v| v.x).reduce(|a, b| a.max(b))?,
+            v.iter().map(|v| v.y).reduce(|a, b| a.max(b))?,
+            v.iter().map(|v| v.z).reduce(|a, b| a.max(b))?,
+        );
+
+        Some(AABB::new(min, max))
     }
 }
