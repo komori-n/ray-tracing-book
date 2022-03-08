@@ -98,25 +98,55 @@ fn random_scene(rng: &mut impl rand::RngCore) -> HittableList {
     HittableList::new(objects)
 }
 
+fn two_spheres(rng: &mut dyn rand::RngCore) -> HittableList {
+    let checker: Arc<dyn Texture + Send + Sync> = Arc::new(CheckerTexture::new(
+        Color::new(0.2, 0.3, 0.1),
+        Color::new(0.9, 0.9, 0.9),
+    ));
+    let ground_material: Arc<dyn Material + Send + Sync> =
+        Arc::new(Lambertian::from_texture(checker));
+    let sphere1 = Sphere::new(Point3::new(0.0, -10.0, 0.0), 10.0, ground_material.clone());
+    let sphere2 = Sphere::new(Point3::new(0.0, 10.0, 0.0), 10.0, ground_material);
+
+    let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    objects.push(Arc::new(sphere1));
+    objects.push(Arc::new(sphere2));
+
+    HittableList::new(objects)
+}
+
 fn output() {
     let mut rng = rand::thread_rng();
     let uni = rand::distributions::Uniform::from(0.0..1.0);
 
     let world = random_scene(&mut rng);
+
+    let (world, lookfrom, lookat, vfov, aperture) = match 2 {
+        1 => (
+            random_scene(&mut rng),
+            Point3::new(13.0, 2.0, 3.0),
+            Point3::new(0.0, 0.0, 0.0),
+            20.0,
+            0.1,
+        ),
+        _ => (
+            two_spheres(&mut rng),
+            Point3::new(13.0, 2.0, 3.0),
+            Point3::new(0.0, 0.0, 0.0),
+            20.0,
+            0.0,
+        ),
+    };
     let world = BVHNode::new(&mut rng, world, 0.0, 1.0);
 
-    let lookfrom = Point3::new(13.0, 2.0, 3.0);
-    let lookat = Point3::new(0.0, 0.0, 0.0);
-    let vup = Vec3::new(0.0, 1.0, 0.0);
-    let dist_to_focus = 10.0;
     let cam = Camera::new(
         lookfrom,
         lookat,
-        vup,
-        20.0,
+        Vec3::new(0.0, 1.0, 0.0),
+        vfov,
         ASPECT_RATIO,
-        APERTURE,
-        dist_to_focus,
+        aperture,
+        10.0,
         0.0,
         1.0,
     );
