@@ -23,10 +23,10 @@ use crate::raytrace::material::{Dielectric, Lambertian, Material, Metal};
 use crate::raytrace::ray::Ray;
 use crate::raytrace::vec3::{Point3, Vec3};
 
-const ASPECT_RATIO: f64 = 16.0 / 9.0;
-const WIDTH: usize = 600;
+const ASPECT_RATIO: f64 = 1.0;
+const WIDTH: usize = 800;
 const HEIGHT: usize = ((WIDTH as f64) / ASPECT_RATIO) as usize;
-const SAMPLES_PER_PIXEL: i64 = 100;
+const SAMPLES_PER_PIXEL: i64 = 10000;
 const MAX_DEPTH: i64 = 50;
 const APERTURE: f64 = 0.1;
 
@@ -213,6 +213,112 @@ fn cornell_box(rng: &mut dyn rand::RngCore) -> HittableList {
     HittableList::new(objects)
 }
 
+fn final_scene(rng: &mut dyn rand::RngCore) -> HittableList {
+    let mut boxes1 = Vec::new();
+    let ground = Arc::new(Lambertian::new(Color::new(0.48, 0.83, 0.53)));
+    for i in 0..21 {
+        for j in 0..21 {
+            let w = 100.0;
+            let x0 = -1000.0 + i as f64 * w;
+            let z0 = -1000.0 + j as f64 * w;
+            let y0 = 0.0;
+            let x1 = x0 + w;
+            let range = rand::distributions::Uniform::from(1.0..101.0);
+            let y1 = range.sample(rng);
+            let z1 = z0 + w;
+            let box1 = Arc::new(Box::new(
+                Point3::new(x0, y0, z0),
+                Point3::new(x1, y1, z1),
+                ground.clone(),
+            ));
+            let box1: Arc<dyn Hittable + Send + Sync> =
+                Arc::new(Translate::new(box1, Vec3::new(-0.9, 0.0, -0.9)));
+            boxes1.push(box1);
+        }
+    }
+
+    let boxes1 = HittableList::new(boxes1);
+    let mut objects: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    objects.push(Arc::new(BVHNode::new(rng, boxes1, 0.0, 1.0)));
+
+    let light = Arc::new(DiffuseLight::new(Color::new(7.0, 7.0, 7.0)));
+    objects.push(Arc::new(ZXRect::new(
+        147.0, 412.0, 123.0, 423.0, 554.0, light,
+    )));
+
+    let center1 = Point3::new(400.0, 400.0, 400.0);
+    let center2 = center1 + Vec3::new(30.0, 0.0, 0.0);
+    let moving_sphere_material = Arc::new(Lambertian::new(Color::new(0.7, 0.3, 0.1)));
+    objects.push(Arc::new(MovingSphere::new(
+        center1,
+        center2,
+        0.0,
+        1.0,
+        50.0,
+        moving_sphere_material,
+    )));
+
+    objects.push(Arc::new(Sphere::new(
+        Point3::new(260.0, 150.0, 45.0),
+        50.0,
+        Arc::new(Dielectric::new(1.5)),
+    )));
+    objects.push(Arc::new(Sphere::new(
+        Point3::new(0.0, 150.0, 145.0),
+        50.0,
+        Arc::new(Metal::new(Color::new(0.8, 0.8, 0.9), 10.0)),
+    )));
+
+    let boundary = Arc::new(Sphere::new(
+        Point3::new(360.0, 150.0, 145.0),
+        50.0,
+        Arc::new(Dielectric::new(1.5)),
+    ));
+    objects.push(boundary.clone());
+    objects.push(Arc::new(ConstantMedium::new(
+        boundary,
+        0.2,
+        Color::new(0.2, 0.4, 0.9),
+    )));
+    let boundary = Arc::new(Sphere::new(
+        Point3::new(0.0, 0.0, 0.0),
+        5000.0,
+        Arc::new(Dielectric::new(1.5)),
+    ));
+    objects.push(Arc::new(ConstantMedium::new(
+        boundary,
+        0.0001,
+        Color::new(1.0, 1.0, 1.0),
+    )));
+
+    let pertext: Arc<dyn Texture + Send + Sync> = Arc::new(NoiseTexture::new(rng, 0.1));
+    objects.push(Arc::new(Sphere::new(
+        Point3::new(220.0, 280.0, 300.0),
+        80.0,
+        Arc::new(Lambertian::from_texture(pertext)),
+    )));
+
+    let mut boxes2: Vec<Arc<dyn Hittable + Send + Sync>> = Vec::new();
+    let white = Arc::new(Lambertian::new(Color::new(0.73, 0.73, 0.73)));
+    for _ in 0..1000 {
+        boxes2.push(Arc::new(Sphere::new(
+            Point3::random_with_minmax(rng, 0.0, 165.0),
+            10.0,
+            white.clone(),
+        )));
+    }
+    let boxes2 = HittableList::new(boxes2);
+    objects.push(Arc::new(Translate::new(
+        Arc::new(RotateY::new(
+            Arc::new(BVHNode::new(rng, boxes2, 0.0, 1.0)),
+            15.0,
+        )),
+        Vec3::new(-100.0, 270.0, 395.0),
+    )));
+
+    HittableList::new(objects)
+}
+
 fn output() {
     let mut rng = rand::thread_rng();
     let uni = rand::distributions::Uniform::from(0.0..1.0);
@@ -250,10 +356,18 @@ fn output() {
             20.0,
             0.0,
         ),
-        _ => (
+        5 => (
             cornell_box(&mut rng),
             Color::new(0.0, 0.0, 0.0),
             Point3::new(278.0, 278.0, -800.0),
+            Point3::new(278.0, 278.0, 0.0),
+            40.0,
+            0.0,
+        ),
+        _ => (
+            final_scene(&mut rng),
+            Color::new(0.0, 0.0, 0.0),
+            Point3::new(478.0, 278.0, -600.0),
             Point3::new(278.0, 278.0, 0.0),
             40.0,
             0.0,
